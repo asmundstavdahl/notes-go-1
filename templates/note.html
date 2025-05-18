@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{if .Found}}
+    <title>{{.Note.Title}} - Go Notes PoC</title>
+    {{else}}
+    <title>Note Not Found - Go Notes PoC</title>
+    {{end}}
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        p { white-space: pre-wrap; /* Preserve line breaks in content */ }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .note-meta { font-size: 0.9em; color: #777; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {{if .Found}}
+            <h1>{{.Note.Title}}</h1>
+            <p class="note-meta">Created: {{.Note.CreatedAt.Format "2006-01-02 15:04"}}</p>
+            <p>{{.Note.Content}}</p>
+        {{else}}
+            <h1>Note Not Found</h1>
+            <p>The note you are looking for does not exist.</p>
+        {{end}}
+        <br>
+        <a href="/">Back to Notes List</a>
+    </div>
+</body>
+</html>
+
