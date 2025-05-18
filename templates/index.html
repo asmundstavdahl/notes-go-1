@@ -26,10 +26,6 @@
         <h2>Create a New Note</h2>
         <form action="/notes/create" method="POST" class="note-form">
             <div>
-                <label for="title">Title:</label><br>
-                <input type="text" id="title" name="title" required><br><br>
-            </div>
-            <div>
                 <label for="content">Content:</label><br>
                 <textarea id="content" name="content" rows="5" required></textarea><br><br>
             </div>
@@ -41,8 +37,7 @@
             <ul>
                 {{range .Notes}}
                     <li>
-                        <a href="/notes/{{.ID}}">{{.Title}}</a>
-                        <p>{{.Content | printf "%.100s..."}}</p> <!-- Show a preview -->
+                        <a href="/notes/{{.ID}}">{{.Content | printf "%.100s..."}}</a>
                         <small>Created: {{.CreatedAt.Format "2006-01-02 15:04"}}</small>
                     </li>
                 {{end}}

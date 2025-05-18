@@ -23,3 +23,7 @@ go.work.sum
 
 # env file
 .env
+server.log
+server.pid
+notes-go-1
+.go-cache/

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {{if .Found}}
-    <title>{{.Note.Title}} - Go Notes PoC</title>
+    <title>Note - Go Notes PoC</title>
     {{else}}
     <title>Note Not Found - Go Notes PoC</title>
     {{end}}
@@ -21,7 +21,6 @@
 <body>
     <div class="container">
         {{if .Found}}
-            <h1>{{.Note.Title}}</h1>
             <p class="note-meta">Created: {{.Note.CreatedAt.Format "2006-01-02 15:04"}}</p>
             <p>{{.Note.Content}}</p>
         {{else}}

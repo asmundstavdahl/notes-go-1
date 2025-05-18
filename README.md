@@ -39,9 +39,9 @@ notes-go-1/
 
 ## Functionality
 
-*   **Create Notes**: On the main page, use the form to create new notes with a title and content.
+*   **Create Notes**: On the main page, use the form to create new notes with content.
 *   **List Notes**: The main page displays a list of all existing notes.
-*   **View Note**: Click on a note's title in the list to view its full content on a separate page.
+*   **View Note**: Click on a note in the list to view its full content on a separate page.
 
 ## Data Persistence
 

@@ -33,9 +33,8 @@ A single note will have the following structure (represented as a Go struct):
 ```go
 // In a suitable Go file, e.g., main.go or a new data.go
 type Note struct {
-    ID      string    `json:"id"`
-    Title   string    `json:"title"` // Or just content if title is not needed for PoC
-    Content string    `json:"content"`
+    ID        string    `json:"id"`
+    Content   string    `json:"content"`
     CreatedAt time.Time `json:"createdAt"`
 }
 ```
@@ -48,7 +47,7 @@ We will implement the following HTTP endpoints using Go's standard `net/http` li
 *   **`GET /`**
     *   **Handler**: `listNotesHandler` (in `handlers.go`)
     *   **Functionality**: Reads notes from `notes.json`, renders `index.html` template, displaying all notes and a form to create a new note.
-    *   **UI**: Basic list of note titles/previews. Form with a textarea for note content and a submit button.
+    *   **UI**: Basic list of note previews. Form with a textarea for note content and a submit button.
 
 *   **`POST /notes/create`** (or simply `POST /` if we handle form submission on the same page)
     *   **Handler**: `createNoteHandler` (in `handlers.go`)

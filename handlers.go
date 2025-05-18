@@ -17,7 +17,6 @@ import (
 // Note defines the structure for a note
 type Note struct {
     ID        string    `json:"id"`
-    Title     string    `json:"title"`
     Content   string    `json:"content"`
     CreatedAt time.Time `json:"createdAt"`
 }
@@ -132,11 +131,10 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    title := r.FormValue("title")
     content := r.FormValue("content")
 
-    if title == "" || content == "" {
-        http.Error(w, "Title and content cannot be empty", http.StatusBadRequest)
+    if content == "" {
+        http.Error(w, "Content cannot be empty", http.StatusBadRequest)
         return
     }
 
@@ -144,7 +142,6 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
     newID := strconv.FormatInt(time.Now().UnixNano(), 10)
     note := Note{
         ID:        newID,
-        Title:     title,
         Content:   content,
         CreatedAt: time.Now(),
     }
