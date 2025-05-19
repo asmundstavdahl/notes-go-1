@@ -13,7 +13,7 @@ notes-go-1/
 │   └── note.html     # Template for viewing a single note
 ├── static/           # (Optional) For any static assets like CSS (very basic for PoC)
 │   └── style.css     # (Currently empty)
-├── notes.json        # Simple JSON file for data persistence (for PoC)
+├── notes.db          # SQLite database file for data persistence (for PoC)
 ├── DESIGN_POC.md     # Design document for the PoC
 └── README.md         # This file
 ```
@@ -45,8 +45,8 @@ notes-go-1/
 
 ## Data Persistence
 
-*   Notes are stored in a `notes.json` file in the root of the project directory.
-*   If `notes.json` is empty or does not exist on first run, the application will create it and start with an empty list of notes. You might see a one-time console message "Error unmarshalling notes data: unexpected end of JSON input" if the file is completely empty, which is normal for the first run.
+*   Notes are stored in a `notes.db` SQLite database file in the root of the project directory.
+*   On first run, the application will create the `notes.db` database and the necessary `notes` table if they do not exist.
 
 ## Collaboration
 

@@ -15,7 +15,7 @@ notes-go-1/
 │   └── note.html     # Template for viewing a single note
 ├── static/           # (Optional) For any static assets like CSS (very basic for PoC)
 │   └── style.css
-└── notes.json        # Simple JSON file for data persistence (for PoC)
+└── notes.db          # SQLite database file for data persistence (for PoC)
 ```
 
 *   **`main.go`**: This will be the entry point of our application. It will set up the HTTP server and define the routes using the `net/http` package.
@@ -24,7 +24,7 @@ notes-go-1/
     *   `index.html`: Will display a list of existing notes and a form (e.g., a text area and a submit button) to create new notes.
     *   `note.html`: Will display the content of a single selected note.
 *   **`static/`**: (Optional for initial PoC) If we decide to add minimal styling, CSS files will go here. These will be served using `http.FileServer`.
-*   **`notes.json`**: For the PoC, we will use a simple JSON file to store and retrieve notes. This avoids external databases and keeps dependencies to the standard library.
+*   **`notes.db`**: For the PoC, we will use a SQLite database file to store and retrieve notes, using Go's `database/sql` package and a SQLite driver.
 
 ## 2. Data Model
 
@@ -62,8 +62,7 @@ We will implement the following HTTP endpoints using Go's standard `net/http` li
 
 *   **HTTP Server & Routing**: `net/http`
 *   **HTML Templating**: `html/template`
-*   **JSON Handling**: `encoding/json` for reading/writing `notes.json`.
-*   **File I/O**: `os` package for reading/writing `notes.json`.
+*   **Database & SQL**: `database/sql` with SQLite driver for data persistence in `notes.db`.
 *   **Form Parsing**: Handled by `http.Request.ParseForm()` and related methods.
 *   **Unique IDs**: For PoC, we can use `time.Now().UnixNano()` converted to a string, or a simple incrementing integer if concurrency is not an immediate concern for the PoC storage.
 
