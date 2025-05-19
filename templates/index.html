@@ -17,6 +17,10 @@
         button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
         .note-form { margin-bottom: 30px; }
+        .note-keywords span, .note-keywords a { font-size: 0.9em; color: #555; margin-right: 5px; }
+        .note-keywords { margin-top: 4px; }
+        .keywords-list { margin-bottom: 14px; margin-top: 7px; }
+        .note-keyword { color: #228; font-size:88%; background:#dde; padding:2px 8px; border-radius:4px; margin-right:2px; }
     </style>
 </head>
 <body>
@@ -29,16 +33,35 @@
                 <label for="content">Content:</label><br>
                 <textarea id="content" name="content" rows="5" required></textarea><br><br>
             </div>
+            <div>
+                <label for="keywords">Keywords (comma separated):</label><br>
+                <input id="keywords" name="keywords" type="text" placeholder="meeting, project, todo"/>
+            </div>
             <button type="submit">Save Note</button>
         </form>
+
+        <div class="keywords-list">
+            <b>Show notes for keyword:</b>
+            {{range .Keywords}}
+              <a href="/keyword/{{.Name}}" class="note-keyword">{{.Name}}</a>
+            {{end}}
+            <a href="/keywords" style="padding-left:10px;">All keywords</a>
+        </div>
 
         <h2>Existing Notes</h2>
         {{if .Notes}}
             <ul>
                 {{range .Notes}}
                     <li>
-                        <a href="/notes/{{.ID}}">{{.Content | printf "%.100s..."}}</a>
-                        <small>Created: {{.CreatedAt.Format "2006-01-02 15:04"}}</small>
+                        <a href="/notes/{{.Note.ID}}">{{shorten .Note.Content}}</a>
+                        <small>Created: {{.Note.CreatedAt.Format "2006-01-02 15:04"}}</small><br>
+                        {{if .Keywords}}
+                        <div class="note-keywords">Nøkkelord:
+                            {{range $i, $k := .Keywords}}
+                                <a href="/keyword/{{$k.Name}}" class="note-keyword">{{$k.Name}}</a>
+                            {{end}}
+                        </div>
+                        {{end}}
                     </li>
                 {{end}}
             </ul>

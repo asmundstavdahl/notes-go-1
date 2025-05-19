@@ -16,6 +16,8 @@
         a { color: #007bff; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .note-meta { font-size: 0.9em; color: #777; margin-bottom: 20px; }
+        .note-keywords { font-size: 0.93em; color: #535392; margin-top: 8px; }
+        .note-keyword { color: #228; font-size:88%; background:#dde; padding:2px 8px; border-radius:4px; margin-right:2px; }
     </style>
 </head>
 <body>
@@ -23,6 +25,13 @@
         {{if .Found}}
             <p class="note-meta">Created: {{.Note.CreatedAt.Format "2006-01-02 15:04"}}</p>
             <p>{{.Note.Content}}</p>
+            {{if .Keywords}}
+                <div class="note-keywords">Nøkkelord:
+                {{range .Keywords}}
+                    <a class="note-keyword" href="/keyword/{{.Name}}">{{.Name}}</a>
+                {{end}}
+                </div>
+            {{end}}
         {{else}}
             <h1>Note Not Found</h1>
             <p>The note you are looking for does not exist.</p>

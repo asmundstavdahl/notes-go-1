@@ -10,10 +10,9 @@ notes-go-1/
 ├── handlers.go       # HTTP handler functions for different routes
 ├── templates/        # Directory for HTML templates
 │   ├── index.html    # Template for listing notes and creating new notes
-│   └── note.html     # Template for viewing a single note
-├── static/           # (Optional) For any static assets like CSS (very basic for PoC)
-│   └── style.css     # (Currently empty)
-├── notes.db          # SQLite database file for data persistence (for PoC)
+│   ├── note.html     # Template for viewing a single note
+│   └── keywords.html # Template for listing and filtering keywords
+├── notes.db          # SQLite database file for data persistence (PoC)
 ├── DESIGN_POC.md     # Design document for the PoC
 └── README.md         # This file
 ```
@@ -42,6 +41,7 @@ notes-go-1/
 *   **Create Notes**: On the main page, use the form to create new notes with content.
 *   **List Notes**: The main page displays a list of all existing notes.
 *   **View Note**: Click on a note in the list to view its full content on a separate page.
+*   **Manage Keywords**: Assign comma-separated keywords to notes, list all keywords, and filter notes by keyword.
 
 ## Data Persistence
 
@@ -49,8 +49,6 @@ notes-go-1/
 *   On first run, the application will create the `notes.db` database and the necessary `notes` table if they do not exist.
 
 ## Collaboration
-
-Please refer to the `COLLABORATION_GUIDELINES.md` (provided earlier) for details on our development workflow.
 
 Once you have reviewed the code, please push it to the `main` branch of our shared GitHub repository: `https://github.com/asmundstavdahl/notes-go-1.git`
 
