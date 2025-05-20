@@ -28,3 +28,4 @@ server.pid
 notes-go-1
 .go-cache/
 notes.db
+.go

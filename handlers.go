@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -36,6 +40,103 @@ var (
 	db        *sql.DB
 	templates *template.Template
 )
+
+type chatMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type chatCompletionRequest struct {
+	Model       string        `json:"model"`
+	Messages    []chatMessage `json:"messages"`
+	Temperature float32       `json:"temperature"`
+}
+
+type chatCompletionResponse struct {
+	Choices []struct {
+		Message chatMessage `json:"message"`
+	} `json:"choices"`
+}
+
+// extractKeywords extracts a focused list of keywords for a note.
+// Most provided existing keywords are from a broad, assorted collection and
+// should only be included if they are entirely appropriate for this note.
+// It also suggests any new relevant keywords via the OpenAI API.
+func extractKeywords(noteContent string, existing []string) ([]string, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("OPENAI_API_KEY not set")
+	}
+	systemPrompt := `You are an assistant that extracts a focused list of keywords for a note. Most of the provided existing keywords are from a broad, assorted collection and are unlikely to be relevant. Include only those existing keywords that are entirely appropriate for this note, and suggest any new relevant keywords. Given the note content and a list of existing keywords, output only valid JSON with a single top-level key "keywords" containing an array of strings. Do not include any additional text or explanation.`
+	existingJSON, err := json.Marshal(existing)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal existing keywords: %v", err)
+	}
+	userPrompt := fmt.Sprintf("Existing keywords: %s\nNote content:\n%s\nRemember: most existing keywords are not relevant unless they are completely appropriate for this note. Only include existing keywords that are entirely appropriate, and suggest any new relevant keywords.", existingJSON, noteContent)
+
+	reqBody := chatCompletionRequest{
+		Model:       "gpt-4.1-nano",
+		Messages:    []chatMessage{{Role: "system", Content: systemPrompt}, {Role: "user", Content: userPrompt}},
+		Temperature: 0.2,
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal chat completion request: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chat completion request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		data, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("chat completion request returned status %s: %s", resp.Status, string(data))
+	}
+	respDataBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read chat completion response: %v", err)
+	}
+	var respData chatCompletionResponse
+	if err := json.Unmarshal(respDataBytes, &respData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal chat completion response: %v", err)
+	}
+	if len(respData.Choices) < 1 {
+		return nil, fmt.Errorf("no choices in chat completion response")
+	}
+	raw := respData.Choices[0].Message.Content
+	clean := strings.TrimSpace(raw)
+	// Remove markdown code fences if present
+	if strings.HasPrefix(clean, "```") {
+		parts := strings.SplitN(clean, "\n", 2)
+		if len(parts) > 1 {
+			clean = parts[1]
+		}
+		clean = strings.TrimSuffix(clean, "```")
+		clean = strings.TrimSpace(clean)
+	}
+	// Extract JSON object between first '{' and last '}'
+	if start := strings.Index(clean, "{"); start >= 0 {
+		if end := strings.LastIndex(clean, "}"); end > start {
+			clean = clean[start : end+1]
+		}
+	}
+	var parsed struct {
+		Keywords []string `json:"keywords"`
+	}
+	if err := json.Unmarshal([]byte(clean), &parsed); err != nil {
+		return nil, fmt.Errorf("failed to parse keywords JSON %q: %v", clean, err)
+	}
+	return parsed.Keywords, nil
+}
 
 // listNotesHandler handles requests to the root path and displays notes (with optional keyword filters)
 func listNotesHandler(w http.ResponseWriter, r *http.Request) {
@@ -147,24 +248,41 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Process comma-separated keywords
-	raw := r.FormValue("keywords")
-	for _, name := range strings.Split(raw, ",") {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
+	var existing []string
+	kwRows, err := db.Query("SELECT name FROM keywords ORDER BY name")
+	if err != nil {
+		log.Printf("Error querying existing keywords: %v", err)
+	} else {
+		defer kwRows.Close()
+		for kwRows.Next() {
+			var k string
+			if err := kwRows.Scan(&k); err != nil {
+				log.Printf("Error scanning existing keyword: %v", err)
+				continue
+			}
+			existing = append(existing, k)
 		}
-		if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
-			log.Printf("Error inserting keyword %q: %v", name, err)
-			continue
+		if err := kwRows.Err(); err != nil {
+			log.Printf("Existing keywords iteration error: %v", err)
 		}
-		var kid int
-		if err := db.QueryRow("SELECT id FROM keywords WHERE name = ?", name).Scan(&kid); err != nil {
-			log.Printf("Error retrieving keyword ID for %q: %v", name, err)
-			continue
-		}
-		if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", newID, kid); err != nil {
-			log.Printf("Error linking note %s with keyword %q: %v", newID, name, err)
+	}
+	autoKeys, err := extractKeywords(content, existing)
+	if err != nil {
+		log.Printf("Error extracting keywords: %v", err)
+	} else {
+		for _, name := range autoKeys {
+			if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
+				log.Printf("Error inserting keyword %q: %v", name, err)
+				continue
+			}
+			var kid int
+			if err := db.QueryRow("SELECT id FROM keywords WHERE name = ?", name).Scan(&kid); err != nil {
+				log.Printf("Error retrieving keyword ID for %q: %v", name, err)
+				continue
+			}
+			if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", newID, kid); err != nil {
+				log.Printf("Error linking note %s with keyword %q: %v", newID, name, err)
+			}
 		}
 	}
 
@@ -232,6 +350,87 @@ func viewNoteHandler(w http.ResponseWriter, r *http.Request) {
 	if err := templates.ExecuteTemplate(w, "note.html", templateData); err != nil {
 		log.Printf("Error executing note template: %v", err)
 		http.Error(w, "Error rendering page", http.StatusInternalServerError)
+	}
+}
+
+// editNoteHandler handles displaying and updating an existing note, including re-extracting keywords.
+func editNoteHandler(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 4 || parts[3] == "" {
+		http.Error(w, "Note ID is missing", http.StatusBadRequest)
+		return
+	}
+	noteID := parts[3]
+	if r.Method == http.MethodGet {
+		var note Note
+		err := db.QueryRow("SELECT id, content, created_at FROM notes WHERE id = ?", noteID).Scan(&note.ID, &note.Content, &note.CreatedAt)
+		if err == sql.ErrNoRows {
+			http.NotFound(w, r)
+			return
+		} else if err != nil {
+			log.Printf("Error querying note for edit %s: %v", noteID, err)
+			http.Error(w, "Error fetching note", http.StatusInternalServerError)
+			return
+		}
+		templateData := struct{ Note Note }{Note: note}
+		if err := templates.ExecuteTemplate(w, "edit_note.html", templateData); err != nil {
+			log.Printf("Error executing edit template: %v", err)
+			http.Error(w, "Error rendering edit page", http.StatusInternalServerError)
+		}
+	} else if r.Method == http.MethodPost {
+		content := r.FormValue("content")
+		if content == "" {
+			http.Error(w, "Content cannot be empty", http.StatusBadRequest)
+			return
+		}
+		if _, err := db.Exec("UPDATE notes SET content = ? WHERE id = ?", content, noteID); err != nil {
+			log.Printf("Error updating note %s: %v", noteID, err)
+			http.Error(w, "Error updating note", http.StatusInternalServerError)
+			return
+		}
+		if _, err := db.Exec("DELETE FROM note_keywords WHERE note_id = ?", noteID); err != nil {
+			log.Printf("Error clearing keywords for note %s: %v", noteID, err)
+		}
+		var existing []string
+		kwRows, err := db.Query("SELECT name FROM keywords ORDER BY name")
+		if err != nil {
+			log.Printf("Error querying existing keywords: %v", err)
+		} else {
+			defer kwRows.Close()
+			for kwRows.Next() {
+				var k string
+				if err := kwRows.Scan(&k); err != nil {
+					log.Printf("Error scanning existing keyword: %v", err)
+					continue
+				}
+				existing = append(existing, k)
+			}
+			if err := kwRows.Err(); err != nil {
+				log.Printf("Existing keywords iteration error: %v", err)
+			}
+		}
+		autoKeys, err := extractKeywords(content, existing)
+		if err != nil {
+			log.Printf("Error extracting keywords on update: %v", err)
+		} else {
+			for _, name := range autoKeys {
+				if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
+					log.Printf("Error inserting keyword %q: %v", name, err)
+					continue
+				}
+				var kid int
+				if err := db.QueryRow("SELECT id FROM keywords WHERE name = ?", name).Scan(&kid); err != nil {
+					log.Printf("Error retrieving keyword ID for %q: %v", name, err)
+					continue
+				}
+				if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", noteID, kid); err != nil {
+					log.Printf("Error linking note %s with keyword %q: %v", noteID, name, err)
+				}
+			}
+		}
+		http.Redirect(w, r, fmt.Sprintf("/notes/%s", noteID), http.StatusFound)
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
 }
 
