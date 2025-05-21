@@ -8,13 +8,15 @@ The project will be organized as follows within the `notes-go-1` repository:
 
 ```
 notes-go-1/
-├── main.go           # Main application file: server setup, routing
+├── main.go           # Entry point for the application
+├── db.go             # Database initialization and schema setup
+├── models.go         # Data model definitions
+├── ai.go             # AI integration and keyword extraction
+├── templates.go      # HTML template initialization
 ├── handlers.go       # HTTP handler functions for different routes
 ├── templates/        # Directory for HTML templates
 │   ├── index.html    # Template for listing notes and creating new notes
 │   └── note.html     # Template for viewing a single note
-├── static/           # (Optional) For any static assets like CSS (very basic for PoC)
-│   └── style.css
 └── notes.db          # SQLite database file for data persistence (for PoC)
 ```
 

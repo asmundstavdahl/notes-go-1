@@ -6,7 +6,11 @@ This is a simple proof-of-concept note-taking web application written in Go usin
 
 ```
 notes-go-1/
-├── main.go           # Main application file: server setup, routing
+├── main.go           # Entry point for the application
+├── db.go             # Database initialization and schema setup
+├── models.go         # Data model definitions
+├── ai.go             # AI integration and keyword extraction
+├── templates.go      # HTML template initialization
 ├── handlers.go       # HTTP handler functions for different routes
 ├── templates/        # Directory for HTML templates
 │   ├── index.html    # Template for listing notes and creating new notes
@@ -29,9 +33,9 @@ notes-go-1/
     ```
 
 2.  **Run the application**:
-    ```bash
-    go run main.go handlers.go
-    ```
+	```bash
+	go run .
+	```
     The server will start, typically on `http://localhost:8080` (the console output will confirm the address).
 
 3.  **Open your web browser** and go to `http://localhost:8080` to use the application.
