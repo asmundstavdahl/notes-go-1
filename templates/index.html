@@ -4,24 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Go Notes PoC</title>
-    <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1, h2 { color: #333; }
-        ul { list-style-type: none; padding: 0; }
-        li { background-color: #eee; margin-bottom: 10px; padding: 10px; border-radius: 4px; }
-        li a { text-decoration: none; color: #007bff; font-weight: bold; }
-        li p { margin-top: 5px; color: #555; }
-        textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; min-height: 100px; }
-        input[type="text"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        .note-form { margin-bottom: 30px; }
-        .note-keywords span, .note-keywords a { font-size: 0.9em; color: #555; margin-right: 5px; }
-        .note-keywords { margin-top: 4px; }
-        .keywords-list { margin-bottom: 14px; margin-top: 7px; }
-        .note-keyword { color: #228; font-size:88%; background:#dde; padding:2px 8px; border-radius:4px; margin-right:2px; }
-    </style>
+    {{template "style" .}}
 </head>
 <body>
     <div class="container">

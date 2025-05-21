@@ -1,0 +1,109 @@
+{{define "style"}}
+<style>
+    :root {
+        --bg: #f4f4f4;
+        --fg: #333;
+        --container-bg: #fff;
+        --container-shadow: rgba(0,0,0,0.1);
+        --header-color: #333;
+        --list-bg: #eee;
+        --link-color: #007bff;
+        --link-hover-bg: #0056b3;
+        --text-muted: #555;
+        --border-color: #ddd;
+        --btn-bg: #007bff;
+        --btn-color: #fff;
+        --note-keyword-bg: #dde;
+        --note-keyword-color: #228;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #121212;
+            --fg: #e0e0e0;
+            --container-bg: #1e1e1e;
+            --container-shadow: rgba(255,255,255,0.1);
+            --header-color: #e0e0e0;
+            --list-bg: #2e2e2e;
+            --link-color: #66aaff;
+            --link-hover-bg: #5599dd;
+            --text-muted: #aaa;
+            --border-color: #444;
+            --btn-bg: #66aaff;
+            --btn-color: #fff;
+            --note-keyword-bg: #444;
+            --note-keyword-color: #88aaff;
+        }
+    }
+    body {
+        font-family: sans-serif;
+        margin: 20px;
+        background-color: var(--bg);
+        color: var(--fg);
+    }
+    .container {
+        background-color: var(--container-bg);
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px var(--container-shadow);
+    }
+    h1, h2 {
+        color: var(--header-color);
+    }
+    ul {
+        list-style-type: none;
+        padding: 0;
+    }
+    li {
+        background-color: var(--list-bg);
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 4px;
+    }
+    li a {
+        text-decoration: none;
+        color: var(--link-color);
+        font-weight: bold;
+    }
+    li p {
+        margin-top: 5px;
+        color: var(--text-muted);
+    }
+    textarea, input[type="text"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    textarea {
+        min-height: 100px;
+    }
+    button {
+        background-color: var(--btn-bg);
+        color: var(--btn-color);
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    button:hover {
+        background-color: var(--link-hover-bg);
+    }
+    .note-form {
+        margin-bottom: 30px;
+    }
+    .keywords-list {
+        margin-bottom: 14px;
+        margin-top: 7px;
+    }
+    .note-keyword {
+        color: var(--note-keyword-color);
+        font-size: 88%;
+        background: var(--note-keyword-bg);
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-right: 2px;
+    }
+</style>
+{{end}}

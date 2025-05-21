@@ -8,17 +8,7 @@
     {{else}}
     <title>Note Not Found - Go Notes PoC</title>
     {{end}}
-    <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; }
-        p { white-space: pre-wrap; /* Preserve line breaks in content */ }
-        a { color: #007bff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .note-meta { font-size: 0.9em; color: #777; margin-bottom: 20px; }
-        .note-keywords { font-size: 0.93em; color: #535392; margin-top: 8px; }
-        .note-keyword { color: #228; font-size:88%; background:#dde; padding:2px 8px; border-radius:4px; margin-right:2px; }
-    </style>
+    {{template "style" .}}
 </head>
 <body>
     <div class="container">
