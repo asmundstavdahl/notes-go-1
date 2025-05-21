@@ -38,10 +38,11 @@ notes-go-1/
 
 ## Functionality
 
-*   **Create Notes**: On the main page, use the form to create new notes with content.
+*   **Create Notes**: On the main page, use the form to create new notes with content and optional comma-separated keywords.
 *   **List Notes**: The main page displays a list of all existing notes.
 *   **View Note**: Click on a note in the list to view its full content on a separate page.
 *   **Manage Keywords**: Assign comma-separated keywords to notes, list all keywords, and filter notes by keyword.
+*   **Automatic Keyword Extraction**: When creating or editing a note, the application automatically extracts and suggests relevant keywords using the OpenAI API, including date keywords in ISO format for explicit dates and relative day mentions (e.g., "i dag", "i går", "i morgen").
 
 ## Data Persistence
 

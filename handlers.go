@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -58,6 +59,63 @@ type chatCompletionResponse struct {
 	} `json:"choices"`
 }
 
+// extractDateKeywords scans note content for relative day mentions and explicit dates,
+// returning unique ISO-formatted date keywords.
+func extractDateKeywords(noteContent string) []string {
+	now := time.Now()
+	lower := strings.ToLower(noteContent)
+	var dates []string
+	if strings.Contains(lower, "i dag") {
+		dates = append(dates, now.Format("2006-01-02"))
+	}
+	if strings.Contains(lower, "i går") {
+		dates = append(dates, now.AddDate(0, 0, -1).Format("2006-01-02"))
+	}
+	if strings.Contains(lower, "i morgen") {
+		dates = append(dates, now.AddDate(0, 0, 1).Format("2006-01-02"))
+	}
+	weekdays := map[string]time.Weekday{
+		"mandag":  time.Monday,
+		"tirsdag": time.Tuesday,
+		"onsdag":  time.Wednesday,
+		"torsdag": time.Thursday,
+		"fredag":  time.Friday,
+		"lørdag":  time.Saturday,
+		"søndag":  time.Sunday,
+	}
+	for name, wd := range weekdays {
+		if strings.Contains(lower, name) {
+			diff := (int(wd) - int(now.Weekday()) + 7) % 7
+			dates = append(dates, now.AddDate(0, 0, diff).Format("2006-01-02"))
+		}
+	}
+	// explicit ISO date patterns
+	isoRe := regexp.MustCompile(`\b\d{4}-\d{2}-\d{2}\b`)
+	for _, match := range isoRe.FindAllString(noteContent, -1) {
+		dates = append(dates, match)
+	}
+	// explicit DMY date patterns (dd.mm.yyyy or dd/mm/yyyy)
+	dmyRe := regexp.MustCompile(`\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b`)
+	for _, match := range dmyRe.FindAllString(noteContent, -1) {
+		norm := strings.ReplaceAll(strings.ReplaceAll(match, ".", "-"), "/", "-")
+		if t, err := time.Parse("2-1-2006", norm); err == nil {
+			dates = append(dates, t.Format("2006-01-02"))
+		} else if t2, err2 := time.Parse("02-01-2006", norm); err2 == nil {
+			dates = append(dates, t2.Format("2006-01-02"))
+		}
+	}
+	// dedupe
+	uniq := make([]string, 0, len(dates))
+	seen := make(map[string]struct{})
+	for _, d := range dates {
+		if _, ok := seen[d]; !ok {
+			seen[d] = struct{}{}
+			uniq = append(uniq, d)
+		}
+	}
+	return uniq
+}
+
 // extractKeywords extracts a focused list of keywords for a note.
 // Most provided existing keywords are from a broad, assorted collection and
 // should only be included if they are entirely appropriate for this note.
@@ -67,7 +125,59 @@ func extractKeywords(noteContent string, existing []string) ([]string, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("OPENAI_API_KEY not set")
 	}
-	systemPrompt := `You are an assistant that extracts a focused list of keywords for a note. Most of the provided existing keywords are from a broad, assorted collection and are unlikely to be relevant. Include only those existing keywords that are entirely appropriate for this note, and suggest any new relevant keywords. Given the note content and a list of existing keywords, output only valid JSON with a single top-level key "keywords" containing an array of strings. Do not include any additional text or explanation.`
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
+	nextMonday := now.AddDate(0, 0, (int(time.Monday)-int(now.Weekday())+7)%7).Format("2006-01-02")
+Note content: "Handle gaver i går"
+Response:
+{
+  "keywords": ["handle","gaver","%s"]
+}
+
+Note content: "Teamsmøte i morgen om budsjett"
+Response:
+{
+  "keywords": ["teamsmøte","budsjett","%s"]
+}
+
+Note content: "Planlegg workshop på mandag"
+Response:
+{
+  "keywords": ["planlegg","workshop","%s"]
+}
+
+Note content: "Bestill konferanse 15.06.2025"
+Response:
+{
+  "keywords": ["bestill","konferanse","2025-06-15"]
+}
+
+You are an assistant that extracts a focused list of keywords for a note. Most of the provided existing keywords are from a broad, assorted collection and are unlikely to be relevant. Include only those existing keywords that are entirely appropriate for this note, and suggest any new relevant keywords. For any dates or day mentions in the note (e.g., "i dag", "i går", "i morgen", or weekday names like "mandag", "tirsdag", etc.), add corresponding date keywords in ISO format. Given the note content and a list of existing keywords, output only valid JSON with a single top-level key "keywords" containing an array of strings. Do not include any additional text or explanation. Today's date is %s.`,
+   // Prepare examples for few-shot prompting
+   examples := []struct {
+       Note     string
+       Keywords []string
+   }{
+       {Note: "Handle gaver i går", Keywords: []string{"handle", "gaver", yesterday}},
+       {Note: "Teamsmøte i morgen om budsjett", Keywords: []string{"teamsmøte", "budsjett", tomorrow}},
+       {Note: "Planlegg workshop på mandag", Keywords: []string{"planlegg", "workshop", nextMonday}},
+       {Note: "Bestill konferanse 15.06.2025", Keywords: []string{"bestill", "konferanse", "2025-06-15"}},
+   }
+   var exBuf strings.Builder
+   exBuf.WriteString("Examples:\n")
+   for _, ex := range examples {
+       exBuf.WriteString(fmt.Sprintf("Note content: \"%s\"\n", ex.Note))
+       respObj := struct {
+           Keywords []string `json:"keywords"`
+       }{Keywords: ex.Keywords}
+       data, _ := json.MarshalIndent(respObj, "", "  ")
+       exBuf.WriteString("Response:\n")
+       exBuf.Write(data)
+       exBuf.WriteString("\n\n")
+   }
+   systemPrompt := fmt.Sprintf(`%sYou are an assistant that extracts a focused list of keywords for a note. Most of the provided existing keywords are from a broad, assorted collection and are unlikely to be relevant. Include only those existing keywords that are entirely appropriate for this note, and suggest any new relevant keywords. For any dates or day mentions in the note (e.g., "i dag", "i går", "i morgen", or weekday names like "mandag", "tirsdag", etc.), add corresponding date keywords in ISO format. Given the note content and a list of existing keywords, output only valid JSON with a single top-level key "keywords" containing an array of strings. Do not include any additional text or explanation. Today's date is %s.`, exBuf.String(), today)
 	existingJSON, err := json.Marshal(existing)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal existing keywords: %v", err)
@@ -135,7 +245,21 @@ func extractKeywords(noteContent string, existing []string) ([]string, error) {
 	if err := json.Unmarshal([]byte(clean), &parsed); err != nil {
 		return nil, fmt.Errorf("failed to parse keywords JSON %q: %v", clean, err)
 	}
-	return parsed.Keywords, nil
+	// merge in date-based keywords for any dates or day mentions
+	keywords := parsed.Keywords
+	for _, d := range extractDateKeywords(noteContent) {
+		found := false
+		for _, k := range keywords {
+			if k == d {
+				found = true
+				break
+			}
+		}
+		if !found {
+			keywords = append(keywords, d)
+		}
+	}
+	return keywords, nil
 }
 
 // listNotesHandler handles requests to the root path and displays notes (with optional keyword filters)
@@ -248,29 +372,12 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var existing []string
-	kwRows, err := db.Query("SELECT name FROM keywords ORDER BY name")
-	if err != nil {
-		log.Printf("Error querying existing keywords: %v", err)
-	} else {
-		defer kwRows.Close()
-		for kwRows.Next() {
-			var k string
-			if err := kwRows.Scan(&k); err != nil {
-				log.Printf("Error scanning existing keyword: %v", err)
+	if kwInput := r.FormValue("keywords"); kwInput != "" {
+		for _, part := range strings.Split(kwInput, ",") {
+			name := strings.TrimSpace(part)
+			if name == "" {
 				continue
 			}
-			existing = append(existing, k)
-		}
-		if err := kwRows.Err(); err != nil {
-			log.Printf("Existing keywords iteration error: %v", err)
-		}
-	}
-	autoKeys, err := extractKeywords(content, existing)
-	if err != nil {
-		log.Printf("Error extracting keywords: %v", err)
-	} else {
-		for _, name := range autoKeys {
 			if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
 				log.Printf("Error inserting keyword %q: %v", name, err)
 				continue
@@ -282,6 +389,44 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", newID, kid); err != nil {
 				log.Printf("Error linking note %s with keyword %q: %v", newID, name, err)
+			}
+		}
+	} else {
+		var existing []string
+		kwRows, err := db.Query("SELECT name FROM keywords ORDER BY name")
+		if err != nil {
+			log.Printf("Error querying existing keywords: %v", err)
+		} else {
+			defer kwRows.Close()
+			for kwRows.Next() {
+				var k string
+				if err := kwRows.Scan(&k); err != nil {
+					log.Printf("Error scanning existing keyword: %v", err)
+					continue
+				}
+				existing = append(existing, k)
+			}
+			if err := kwRows.Err(); err != nil {
+				log.Printf("Existing keywords iteration error: %v", err)
+			}
+		}
+		autoKeys, err := extractKeywords(content, existing)
+		if err != nil {
+			log.Printf("Error extracting keywords: %v", err)
+		} else {
+			for _, name := range autoKeys {
+				if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
+					log.Printf("Error inserting keyword %q: %v", name, err)
+					continue
+				}
+				var kid int
+				if err := db.QueryRow("SELECT id FROM keywords WHERE name = ?", name).Scan(&kid); err != nil {
+					log.Printf("Error retrieving keyword ID for %q: %v", name, err)
+					continue
+				}
+				if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", newID, kid); err != nil {
+					log.Printf("Error linking note %s with keyword %q: %v", newID, name, err)
+				}
 			}
 		}
 	}
@@ -372,7 +517,31 @@ func editNoteHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Error fetching note", http.StatusInternalServerError)
 			return
 		}
-		templateData := struct{ Note Note }{Note: note}
+		var noteKeywords []Keyword
+		kwRows, err := db.Query("SELECT k.name FROM keywords k JOIN note_keywords nk ON k.id = nk.keyword_id WHERE nk.note_id = ?", noteID)
+		if err != nil {
+			log.Printf("Error querying keywords for note %s: %v", noteID, err)
+		} else {
+			defer kwRows.Close()
+			for kwRows.Next() {
+				var k string
+				if err := kwRows.Scan(&k); err != nil {
+					log.Printf("Error scanning keyword for note %s: %v", noteID, err)
+					continue
+				}
+				noteKeywords = append(noteKeywords, Keyword{Name: k})
+			}
+			if err := kwRows.Err(); err != nil {
+				log.Printf("Keyword rows iteration error for note %s: %v", noteID, err)
+			}
+		}
+		templateData := struct {
+			Note     Note
+			Keywords []Keyword
+		}{
+			Note:     note,
+			Keywords: noteKeywords,
+		}
 		if err := templates.ExecuteTemplate(w, "edit_note.html", templateData); err != nil {
 			log.Printf("Error executing edit template: %v", err)
 			http.Error(w, "Error rendering edit page", http.StatusInternalServerError)
@@ -391,29 +560,12 @@ func editNoteHandler(w http.ResponseWriter, r *http.Request) {
 		if _, err := db.Exec("DELETE FROM note_keywords WHERE note_id = ?", noteID); err != nil {
 			log.Printf("Error clearing keywords for note %s: %v", noteID, err)
 		}
-		var existing []string
-		kwRows, err := db.Query("SELECT name FROM keywords ORDER BY name")
-		if err != nil {
-			log.Printf("Error querying existing keywords: %v", err)
-		} else {
-			defer kwRows.Close()
-			for kwRows.Next() {
-				var k string
-				if err := kwRows.Scan(&k); err != nil {
-					log.Printf("Error scanning existing keyword: %v", err)
+		if kwInput := r.FormValue("keywords"); kwInput != "" {
+			for _, part := range strings.Split(kwInput, ",") {
+				name := strings.TrimSpace(part)
+				if name == "" {
 					continue
 				}
-				existing = append(existing, k)
-			}
-			if err := kwRows.Err(); err != nil {
-				log.Printf("Existing keywords iteration error: %v", err)
-			}
-		}
-		autoKeys, err := extractKeywords(content, existing)
-		if err != nil {
-			log.Printf("Error extracting keywords on update: %v", err)
-		} else {
-			for _, name := range autoKeys {
 				if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
 					log.Printf("Error inserting keyword %q: %v", name, err)
 					continue
@@ -425,6 +577,44 @@ func editNoteHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", noteID, kid); err != nil {
 					log.Printf("Error linking note %s with keyword %q: %v", noteID, name, err)
+				}
+			}
+		} else {
+			var existing []string
+			kwRows, err := db.Query("SELECT name FROM keywords ORDER BY name")
+			if err != nil {
+				log.Printf("Error querying existing keywords: %v", err)
+			} else {
+				defer kwRows.Close()
+				for kwRows.Next() {
+					var k string
+					if err := kwRows.Scan(&k); err != nil {
+						log.Printf("Error scanning existing keyword: %v", err)
+						continue
+					}
+					existing = append(existing, k)
+				}
+				if err := kwRows.Err(); err != nil {
+					log.Printf("Existing keywords iteration error: %v", err)
+				}
+			}
+			autoKeys, err := extractKeywords(content, existing)
+			if err != nil {
+				log.Printf("Error extracting keywords on update: %v", err)
+			} else {
+				for _, name := range autoKeys {
+					if _, err := db.Exec("INSERT OR IGNORE INTO keywords(name) VALUES(?)", name); err != nil {
+						log.Printf("Error inserting keyword %q: %v", name, err)
+						continue
+					}
+					var kid int
+					if err := db.QueryRow("SELECT id FROM keywords WHERE name = ?", name).Scan(&kid); err != nil {
+						log.Printf("Error retrieving keyword ID for %q: %v", name, err)
+						continue
+					}
+					if _, err := db.Exec("INSERT OR IGNORE INTO note_keywords(note_id, keyword_id) VALUES(?, ?)", noteID, kid); err != nil {
+						log.Printf("Error linking note %s with keyword %q: %v", noteID, name, err)
+					}
 				}
 			}
 		}
@@ -467,6 +657,13 @@ func initTemplates() {
 				return s[:100] + "..."
 			}
 			return s
+		},
+		"joinKeywords": func(keys []Keyword) string {
+			var names []string
+			for _, k := range keys {
+				names = append(names, k.Name)
+			}
+			return strings.Join(names, ", ")
 		},
 	}
 	templates = template.Must(
